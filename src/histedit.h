@@ -45,6 +45,7 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -314,6 +315,26 @@ int		 tok_wline(TokenizerW *, const LineInfoW *,
 		    int *, const wchar_t ***, int *, int *);
 int		 tok_wstr(TokenizerW *, const wchar_t *,
 		    int *, const wchar_t ***);
+
+/*
+ * ==== Color ====
+ */
+typedef struct grparams {
+	union {
+		struct {
+			/* 256 colors is enough for everyone, right? */
+			unsigned fgcolor   : 8; /* &7 unless xterm-256color */
+			unsigned bgcolor   : 8; /* &7 unless xterm-256color */
+			unsigned bold      : 1;
+			unsigned italic    : 1;
+			unsigned underline : 1;
+			unsigned inverse   : 1;
+			unsigned blink     : 1;
+			unsigned reserved  : 11;
+		};
+		uint32_t raw;
+	};
+} GrParams;
 
 #ifdef __cplusplus
 }

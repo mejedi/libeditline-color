@@ -48,6 +48,7 @@
 
 #include "histedit.h"
 #include "chartype.h"
+#include <stddef.h>
 #include <stdio.h>
 #include <sys/types.h>
 
@@ -160,4 +161,101 @@ protected int	el_editmode(EditLine *, int, const Char **);
 #else
 #define EL_ABORT(a)	abort()
 #endif
+
+/* sizeof ( union { T array[N]; TA aligner; } ) */
+#define EL_ARRAY_SIZE(T, N, TA) \
+	((sizeof(T)*(size_t)(N) + __alignof__(TA) - 1) & \
+	 ~(size_t)(__alignof__(TA) - 1))
+
+/*
+ * A display (i.e. el_display, el_vdisplay) is an array of pointers to
+ * a line character data.
+ *
+ * A character in position X,Y is stored in el_display[Y][X].
+ * Graphic attributes (if COLOR enabled) are in
+ *   ((GrParams *) el_display[Y] ) [ -X - 1]
+ *
+ * In other words, line memory layout is as follows:
+ *
+ *                      el_display[i]
+ *                    /
+ *   GRn ... GR1 GR0 | CHAR0 CHAR1 ... CHARn
+ *   ---------------   ---------------------
+ *   EL_DISPLAY_GR_SIZE EL_DISPLAY_CHAR_SIZE
+ *
+ * Lines go in memory without gaps, enables mapping a Char * pointer to
+ * GR data (2 displays to consider, simple range check tells if a
+ * pointer belongs to a display).
+ */
+
+/* char data size (one display line) */
+#define EL_DISPLAY_CHAR_SIZE(COLS) \
+	EL_ARRAY_SIZE(Char, COLS, GrParams)
+
+/* gr data size (one display line) */
+#ifdef COLOR
+#define EL_DISPLAY_GR_SIZE(COLS) \
+	EL_ARRAY_SIZE(GrParams, COLS, Char)
+#else
+#define EL_DISPLAY_GR_SIZE(COLS) 0
+#endif
+
+/*
+ * EL_GRPARAMS(el, el_dislay,   Y, X)
+ * EL_GRPARAMS(el, el_vdisplay, Y, X) - get/set GR attributes in X,Y
+ *                                      cell on either display
+ */
+#define EL_GRPARAMS(el, name, v_, h_) \
+	(((GrParams *)((el)->name[(v_)]))[-1-(ptrdiff_t)(h_)])
+
+/*
+ * Lookup GR attributes by a Char * pointer. Considers el_display and
+ * el_vdisplay.
+ *
+ * Note: GR attributes are in reverse order.
+ *
+ *  el_grparams(c) [ 0] <--> c [0]
+ *  el_grparams(c) [-1] <--> c [1]
+ *  el_grparams(c) [-2] <--> c [2]
+ */
+private inline const GrParams *
+el_grparams(EditLine *el, const Char *cp)
+{
+#ifdef COLOR
+	coord_t c = el->el_terminal.t_size;
+	size_t line_size =
+	    EL_DISPLAY_GR_SIZE(c.h + 1) +
+	    EL_DISPLAY_CHAR_SIZE(c.h + 1);
+	/*
+	 * Origin == original line #0; el_display[0] may store a
+	 * different value due to buffer scrolling.
+	 */
+	size_t origin_offset =
+	    sizeof(el->el_display[0]) * (size_t)(c.v + 1) +
+	    EL_DISPLAY_GR_SIZE(c.h + 1);
+	char *origin  = (char *)el->el_display + origin_offset;
+	char *vorigin = (char *)el->el_vdisplay + origin_offset;
+	size_t index;
+	if ((char *)cp >= origin && (char *)cp < origin + line_size * c.v) {
+		;
+	} else if ((char *)cp >= vorigin && (char *)cp < vorigin + line_size * c.v) {
+		origin = vorigin;
+	} else {
+		return NULL;
+	}
+	index = (((char *)cp - origin) % line_size) / sizeof(Char);
+	if (index > c.h)
+		return NULL;
+	return (const GrParams *)(cp - index) - index - 1;
+#endif
+	return NULL;
+}
+
+private inline GrParams gr_default()
+{
+	GrParams gr = {};
+	gr.fgcolor = 1;
+	return gr;
+}
+
 #endif /* _h_el */

@@ -83,3 +83,20 @@ AC_DEFUN([EL_ENABLE_WIDEC],
    AM_CONDITIONAL([WIDECHAR], [test "$with_widec" = yes])
 ])
 
+
+dnl
+dnl use option --enable-color to turn on color support
+dnl
+AC_DEFUN([EL_ENABLE_COLOR],
+[
+   AC_MSG_CHECKING(if you want color code)
+   AC_ARG_ENABLE(color,
+      [  --enable-color          compile with color-support code],
+      [with_color=$enableval],
+      [with_color=no])
+   AC_MSG_RESULT($with_color)
+   if test "$with_color" = yes ; then
+      AC_DEFINE(COLOR, 1, [Define to 1 if you want color-support code])
+   fi
+   AM_CONDITIONAL([COLOR], [test "$with_color" = yes])
+])

@@ -643,6 +643,8 @@ HAVE_STRLCPY_TRUE
 LIBOBJS
 ENABLE_EXAMPLES_FALSE
 ENABLE_EXAMPLES_TRUE
+COLOR_FALSE
+COLOR_TRUE
 WIDECHAR_FALSE
 WIDECHAR_TRUE
 MANTYPE
@@ -773,6 +775,7 @@ with_gnu_ld
 with_sysroot
 enable_libtool_lock
 enable_widec
+enable_color
 enable_examples
 '
       ac_precious_vars='build_alias
@@ -1415,6 +1418,7 @@ Optional Features:
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
   --enable-widec          compile with wide-char/UTF-8 code
+  --enable-color          compile with color-support code
   --enable-examples       build the example programs [default=yes]
 
 Optional Packages:
@@ -12284,6 +12288,34 @@ fi
 
 
 
+### use option --enable-color to enable color support
+
+   { $as_echo "$as_me:${as_lineno-$LINENO}: checking if you want color code" >&5
+$as_echo_n "checking if you want color code... " >&6; }
+   # Check whether --enable-color was given.
+if test "${enable_color+set}" = set; then :
+  enableval=$enable_color; with_color=$enableval
+else
+  with_color=no
+fi
+
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_color" >&5
+$as_echo "$with_color" >&6; }
+   if test "$with_color" = yes ; then
+
+$as_echo "#define COLOR 1" >>confdefs.h
+
+   fi
+    if test "$with_color" = yes; then
+  COLOR_TRUE=
+  COLOR_FALSE='#'
+else
+  COLOR_TRUE='#'
+  COLOR_FALSE=
+fi
+
+
+
 # Check whether --enable-examples was given.
 if test "${enable_examples+set}" = set; then :
   enableval=$enable_examples; enable_examples="$enableval"
@@ -13518,6 +13550,10 @@ fi
 
 if test -z "${WIDECHAR_TRUE}" && test -z "${WIDECHAR_FALSE}"; then
   as_fn_error $? "conditional \"WIDECHAR\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${COLOR_TRUE}" && test -z "${COLOR_FALSE}"; then
+  as_fn_error $? "conditional \"COLOR\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${ENABLE_EXAMPLES_TRUE}" && test -z "${ENABLE_EXAMPLES_FALSE}"; then

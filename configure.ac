@@ -65,6 +65,9 @@ AC_CHECK_LIB(tinfo, tgetent,,
 ### use option --enable-widec to turn on use of wide-character support
 EL_ENABLE_WIDEC
 
+### use option --enable-color to enable color support
+EL_ENABLE_COLOR
+
 AC_ARG_ENABLE(
   [examples],
   [AS_HELP_STRING([--enable-examples], [build the example programs [default=yes]])],

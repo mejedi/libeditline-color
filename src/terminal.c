@@ -405,46 +405,39 @@ terminal_rebuffer_display(EditLine *el)
 	return 0;
 }
 
-
 /* terminal_alloc_display():
  *	Allocate a new display.
  */
 private int
 terminal_alloc_display(EditLine *el)
 {
-	int i;
+	coord_t c = el->el_terminal.t_size;
+	int i, j;
 	Char **b;
-	coord_t *c = &el->el_terminal.t_size;
+	size_t vec_size;
+	size_t line_size;
+	size_t total_size;
 
-	b =  el_malloc(sizeof(*b) * (size_t)(c->v + 1));
-	if (b == NULL)
-		return -1;
-	for (i = 0; i < c->v; i++) {
-		b[i] = el_malloc(sizeof(**b) * (size_t)(c->h + 1));
-		if (b[i] == NULL) {
-			while (--i >= 0)
-				el_free(b[i]);
-			el_free(b);
-			return -1;
-		}
-	}
-	b[c->v] = NULL;
-	el->el_display = b;
+	vec_size = sizeof(*b) * (size_t)(c.v + 1);
+	line_size =
+	    EL_DISPLAY_GR_SIZE(c.h + 1) +
+	    EL_DISPLAY_CHAR_SIZE(c.h + 1);
 
-	b = el_malloc(sizeof(*b) * (size_t)(c->v + 1));
-	if (b == NULL)
-		return -1;
-	for (i = 0; i < c->v; i++) {
-		b[i] = el_malloc(sizeof(**b) * (size_t)(c->h + 1));
-		if (b[i] == NULL) {
-			while (--i >= 0)
-				el_free(b[i]);
-			el_free(b);
+	for (j = 0; j < 2; j++)
+	{
+		char *mem =  el_malloc(vec_size + line_size * (size_t)c.v);
+		if (mem == NULL)
 			return -1;
+		b = (void *)mem;
+		mem += vec_size + EL_DISPLAY_GR_SIZE(c.h + 1);
+
+		for (i = 0; i < c.v; i++) {
+			b[i] = (void *)mem;
+			mem += line_size;
 		}
+		b[c.v] = NULL;
+		*(j ? &el->el_display : &el->el_vdisplay) = b;
 	}
-	b[c->v] = NULL;
-	el->el_vdisplay = b;
 	return 0;
 }
 
@@ -455,23 +448,10 @@ terminal_alloc_display(EditLine *el)
 private void
 terminal_free_display(EditLine *el)
 {
-	Char **b;
-	Char **bufp;
-
-	b = el->el_display;
+	el_free(el->el_display);
 	el->el_display = NULL;
-	if (b != NULL) {
-		for (bufp = b; *bufp != NULL; bufp++)
-			el_free(*bufp);
-		el_free(b);
-	}
-	b = el->el_vdisplay;
+	el_free(el->el_vdisplay);
 	el->el_vdisplay = NULL;
-	if (b != NULL) {
-		for (bufp = b; *bufp != NULL; bufp++)
-			el_free(*bufp);
-		el_free(b);
-	}
 }
 
 
@@ -639,6 +619,90 @@ mc_again:
 }
 
 
+#ifdef COLOR
+private int init_sgr(char *buf, GrParams from, GrParams to)
+{
+	int len = 0;
+#define SGR__(s)                                       \
+	do {                                           \
+		memcpy(buf + len, s, sizeof(""s) - 1); \
+		len += sizeof(""s) - 1;                \
+	} while (0)
+
+	if (from.bold != to.bold) {
+		if (to.bold)
+			SGR__(";1");
+		else
+			SGR__(";21"); /* XXX: bold.off not widely supported */
+	}
+	if (from.italic != to.italic) {
+		if (to.italic)
+			SGR__(";3");
+		else
+			SGR__(";23");
+	}
+	if (from.underline != to.underline) {
+		if (to.underline)
+			SGR__(";4");
+		else
+			SGR__(";24");
+	}
+	if (from.inverse != to.inverse) {
+		if (to.inverse)
+			SGR__(";7");
+		else
+			SGR__(";27");
+	}
+	if (from.blink != to.blink) {
+		if (to.blink)
+			SGR__(";5");
+		else
+			SGR__(";25");
+	}
+	if (from.fgcolor != to.fgcolor) {
+		if (to.fgcolor < 8)
+			len += sprintf(buf + len, ";3%d", to.fgcolor);
+		else
+			len += sprintf(buf + len, ";38;5;%d", to.fgcolor);
+	}
+	if (from.bgcolor != to.bgcolor) {
+		if (to.bgcolor < 8)
+			len += sprintf(buf + len, ";4%d", to.fgcolor);
+		else
+			len += sprintf(buf + len, ";48;5;%d", to.fgcolor);
+	}
+	buf[len++] = 'm';
+	buf[len] = '\0';
+	return len;
+}
+
+
+private void
+terminal___sgr(EditLine *el, GrParams from, GrParams to)
+{
+	char sgr1[128], sgr2[128];
+	if (2 + init_sgr(sgr1+3, gr_default(), to) <
+	    init_sgr(sgr2+1, from, to)) {
+
+		memcpy(sgr1, "\33[0", 3);
+		fputs(sgr1, el->el_outfile);
+	} else {
+		memcpy(sgr2, "\33[", 2);
+		fputs(sgr2, el->el_outfile);
+	}
+}
+
+
+private inline GrParams
+terminal__sgr(EditLine *el, GrParams from, GrParams to)
+{
+	if (from.raw != to.raw)
+		terminal___sgr(el, from, to);
+	return to;
+}
+#endif
+
+
 /* terminal_overwrite():
  *	Overstrike num characters
  *	Assumes MB_FILL_CHARs are present to keep the column count correct
@@ -646,8 +710,16 @@ mc_again:
 protected void
 terminal_overwrite(EditLine *el, const Char *cp, size_t n)
 {
+#ifdef COLOR
+	GrParams output_gr = gr_default();
+	const GrParams *gr;
+#endif
 	if (n == 0)
 		return;
+
+#ifdef COLOR
+	gr = el_grparams(el, cp);
+#endif
 
 	if (n > (size_t)el->el_terminal.t_size.h) {
 #ifdef DEBUG_SCREEN
@@ -658,10 +730,19 @@ terminal_overwrite(EditLine *el, const Char *cp, size_t n)
 	}
 
         do {
+#ifdef COLOR
+		if (gr != NULL) {
+			output_gr = terminal__sgr(el, output_gr, *gr--);
+		}
+#endif
                 /* terminal__putc() ignores any MB_FILL_CHARs */
                 terminal__putc(el, *cp++);
                 el->el_cursor.h++;
         } while (--n);
+
+#ifdef COLOR
+	terminal__sgr(el, output_gr, gr_default());
+#endif
 
 	if (el->el_cursor.h >= el->el_terminal.t_size.h) {	/* wrap? */
 		if (EL_HAS_AUTO_MARGINS) {	/* yes */
@@ -670,10 +751,10 @@ terminal_overwrite(EditLine *el, const Char *cp, size_t n)
 			if (EL_HAS_MAGIC_MARGINS) {
 				/* force the wrap to avoid the "magic"
 				 * situation */
-				Char c;
-				if ((c = el->el_display[el->el_cursor.v]
-				    [el->el_cursor.h]) != '\0') {
-					terminal_overwrite(el, &c, (size_t)1);
+				Char *c;
+				if (*(c = el->el_display[el->el_cursor.v] +
+				    el->el_cursor.h) != '\0') {
+					terminal_overwrite(el, c, (size_t)1);
 #ifdef WIDECHAR
 					while (el->el_display[el->el_cursor.v]
 					    [el->el_cursor.h] == MB_FILL_CHAR)
@@ -736,8 +817,12 @@ terminal_deletechars(EditLine *el, int num)
  *      Assumes MB_FILL_CHARs are present to keep column count correct
  */
 protected void
-terminal_insertwrite(EditLine *el, Char *cp, int num)
+terminal_insertwrite(EditLine *el, const Char *cp, size_t num)
 {
+#ifdef COLOR
+	GrParams output_gr = gr_default();
+	const GrParams *gr;
+#endif
 	if (num <= 0)
 		return;
 	if (!EL_CAN_INSERT) {
@@ -756,18 +841,31 @@ terminal_insertwrite(EditLine *el, Char *cp, int num)
 	if (GoodStr(T_IC))	/* if I have multiple insert */
 		if ((num > 1) || !GoodStr(T_ic)) {
 				/* if ic would be more expensive */
+			/* XXX MB_FILL_CHAR */
 			terminal_tputs(el, tgoto(Str(T_IC), num, num), num);
 			terminal_overwrite(el, cp, (size_t)num);
 				/* this updates el_cursor.h */
 			return;
 		}
+#ifdef COLOR
+	gr = el_grparams(el, cp);
+#endif
 	if (GoodStr(T_im) && GoodStr(T_ei)) {	/* if I have insert mode */
 		terminal_tputs(el, Str(T_im), 1);
 
 		el->el_cursor.h += num;
-		do
+		do {
+#ifdef COLOR
+			if (gr != NULL) {
+				output_gr = terminal__sgr(el, output_gr, *gr--);
+			}
+#endif
 			terminal__putc(el, *cp++);
-		while (--num);
+		} while (--num);
+
+#ifdef COLOR
+		terminal__sgr(el, output_gr, gr_default());
+#endif
 
 		if (GoodStr(T_ip))	/* have to make num chars insert */
 			terminal_tputs(el, Str(T_ip), 1);
@@ -779,6 +877,12 @@ terminal_insertwrite(EditLine *el, Char *cp, int num)
 		if (GoodStr(T_ic))	/* have to make num chars insert */
 			terminal_tputs(el, Str(T_ic), 1);
 
+#ifdef COLOR
+		if (gr != NULL) {
+			output_gr = terminal__sgr(el, output_gr, *gr--);
+		}
+#endif
+		/* XXX MB_FILL_CHAR */
 		terminal__putc(el, *cp++);
 
 		el->el_cursor.h++;
@@ -788,6 +892,10 @@ terminal_insertwrite(EditLine *el, Char *cp, int num)
 					/* pad the inserted char */
 
 	} while (--num);
+
+#ifdef COLOR
+	terminal__sgr(el, output_gr, gr_default());
+#endif
 }
 
 

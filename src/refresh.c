@@ -52,7 +52,7 @@ __RCSID("$NetBSD: refresh.c,v 1.37 2011/07/29 23:44:45 christos Exp $");
 #include "el.h"
 
 private void	re_nextline(EditLine *);
-private void	re_addc(EditLine *, Int);
+private void	re_putc(EditLine *, GrParams, Int, int);
 private void	re_update_line(EditLine *, Char *, Char *, int);
 private void	re_insert (EditLine *, Char *, int, int, Char *, int);
 private void	re_delete(EditLine *, Char *, int, int, int);
@@ -124,58 +124,71 @@ re_nextline(EditLine *el)
 /* re_addc():
  *	Draw c, expanding tabs, control chars etc.
  */
-private void
-re_addc(EditLine *el, Int c)
+protected void
+re_addc(EditLine *el, GrParams gr, Int c)
 {
 	switch (ct_chr_class((Char)c)) {
 	case CHTYPE_TAB:        /* expand the tab */
 		for (;;) {
-			re_putc(el, ' ', 1);
+			re_putc(el, gr, ' ', 1);
 			if ((el->el_refresh.r_cursor.h & 07) == 0)
 				break;			/* go until tab stop */
 		}
 		break;
 	case CHTYPE_NL: {
 		int oldv = el->el_refresh.r_cursor.v;
-		re_putc(el, '\0', 0);			/* assure end of line */
+		re_putc(el, gr_default(), '\0', 0);			/* assure end of line */
 		if (oldv == el->el_refresh.r_cursor.v)	/* XXX */
 			re_nextline(el);
 		break;
 	}
 	case CHTYPE_PRINT:
-		re_putc(el, c, 1);
+		re_putc(el, gr, c, 1);
 		break;
 	default: {
 		Char visbuf[VISUAL_WIDTH_MAX];
 		ssize_t i, n =
 		    ct_visual_char(visbuf, VISUAL_WIDTH_MAX, (Char)c);
 		for (i = 0; n-- > 0; ++i)
-		    re_putc(el, visbuf[i], 1);
+		    re_putc(el, gr, visbuf[i], 1);
 		break;
 	}
 	}
 }
 
-
 /* re_putc():
  *	Draw the character given
  */
-protected void
-re_putc(EditLine *el, Int c, int shift)
+private void
+re_putc(EditLine *el, GrParams gr, Int c, int shift)
 {
 	int i, w = Width(c);
 	ELRE_DEBUG(1, (__F, "printing %5x '%c'\r\n", c, c));
 
 	while (shift && (el->el_refresh.r_cursor.h + w > el->el_terminal.t_size.h))
-	    re_putc(el, ' ', 1);
+	    re_putc(el, gr_default(), ' ', 1);
 
 	el->el_vdisplay[el->el_refresh.r_cursor.v]
 	    [el->el_refresh.r_cursor.h] = c;
+
+#ifdef COLOR
+	/* XXX mask unused bits */
+	EL_GRPARAMS(el, el_vdisplay, el->el_refresh.r_cursor.v,
+	    el->el_refresh.r_cursor.h) = gr;
+#else
+	(void)gr;
+#endif
+
 	/* assumes !shift is only used for single-column chars */
 	i = w;
-	while (--i > 0)
+	while (--i > 0) {
 		el->el_vdisplay[el->el_refresh.r_cursor.v]
 		    [el->el_refresh.r_cursor.h + i] = MB_FILL_CHAR;
+#ifdef COLOR
+		EL_GRPARAMS(el, el_vdisplay, el->el_refresh.r_cursor.v,
+		    el->el_refresh.r_cursor.h + i) = gr;
+#endif
+	}
 
 	if (!shift)
 		return;
@@ -183,8 +196,12 @@ re_putc(EditLine *el, Int c, int shift)
 	el->el_refresh.r_cursor.h += w;	/* advance to next place */
 	if (el->el_refresh.r_cursor.h >= el->el_terminal.t_size.h) {
 		/* assure end of line */
-		el->el_vdisplay[el->el_refresh.r_cursor.v][el->el_terminal.t_size.h]
-		    = '\0';
+		el->el_vdisplay[el->el_refresh.r_cursor.v]
+		    [el->el_terminal.t_size.h] = '\0';
+#ifdef COLOR
+		EL_GRPARAMS(el, el_vdisplay, el->el_refresh.r_cursor.v,
+		    el->el_refresh.r_cursor.h) = gr_default();
+#endif
 		re_nextline(el);
 	}
 }
@@ -263,7 +280,7 @@ re_refresh(EditLine *el)
 				cur.v++;
                         }
 		}
-		re_addc(el, *cp);
+		re_addc(el, gr_default(), *cp);
 	}
 
 	if (cur.h == -1) {	/* if I haven't been set yet, I'm at the end */
@@ -280,14 +297,14 @@ re_refresh(EditLine *el)
 		 * one character gap to the input buffer.
 		 */
 		while (--rhdiff > 0)	/* pad out with spaces */
-			re_putc(el, ' ', 1);
+			re_putc(el, gr_default(), ' ', 1);
 		prompt_print(el, EL_RPROMPT);
 	} else {
 		el->el_rprompt.p_pos.h = 0;	/* flag "not using rprompt" */
 		el->el_rprompt.p_pos.v = 0;
 	}
 
-	re_putc(el, '\0', 0);	/* make line ended with NUL, no cursor shift */
+	re_putc(el, gr_default(), '\0', 0);	/* make line ended with NUL, no cursor shift */
 
 	el->el_refresh.r_newcv = el->el_refresh.r_cursor.v;
 
@@ -506,10 +523,21 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 	int fx, sx;
 	size_t len;
 
+/* Parameter order in OLD_EQ_NEW is important! */
+#ifdef COLOR
+#define OLD_EQ_NEW(old_p, new_p) \
+	(*(old_p) == *(new_p) && \
+	((GrParams *)old)[ old - old_p - 1 ].raw == \
+	((GrParams *)new)[ new - new_p - 1 ].raw)
+#else
+#define OLD_EQ_NEW(old_p, new_p) \
+	*(old_p) == *(new_p)
+#endif
+
 	/*
          * find first diff
          */
-	for (o = old, n = new; *o && (*o == *n); o++, n++)
+	for (o = old, n = new; *o && OLD_EQ_NEW(o, n); o++, n++)
 		continue;
 	ofd = o;
 	nfd = n;
@@ -526,6 +554,11 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 	while (ofd < o) {
 		if (o[-1] != ' ')
 			break;
+#ifdef COLOR
+		/* Blanks may have non-standard GR attributes */
+		if (((GrParams *)old)[old - o].raw != gr_default().raw)
+			break;
+#endif
 		o--;
 	}
 	oe = o;
@@ -538,6 +571,11 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 	while (nfd < n) {
 		if (n[-1] != ' ')
 			break;
+#ifdef COLOR
+		/* Blanks may have non-standard GR attributes */
+		if (((GrParams *)new)[new - n].raw != gr_default().raw)
+			break;
+#endif
 		n--;
 	}
 	ne = n;
@@ -553,7 +591,7 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 	/*
          * find last same pointer
          */
-	while ((o > ofd) && (n > nfd) && (*--o == *--n))
+	while ((o > ofd) && (n > nfd) && (o--, n--, OLD_EQ_NEW(o, n)))
 		continue;
 	ols = ++o;
 	nls = ++n;
@@ -573,7 +611,7 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 		for (c = *ofd, n = nfd; n < nls; n++) {
 			if (c == *n) {
 				for (o = ofd, p = n;
-				    p < nls && o < ols && *o == *p;
+				    p < nls && o < ols && OLD_EQ_NEW(o, p);
 				    o++, p++)
 					continue;
 				/*
@@ -597,7 +635,7 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 		for (c = *nfd, o = ofd; o < ols; o++) {
 			if (c == *o) {
 				for (n = nfd, p = o;
-				    p < ols && n < nls && *p == *n;
+				    p < ols && n < nls && OLD_EQ_NEW(p, n);
 				    p++, n++)
 					continue;
 				/*
@@ -965,23 +1003,37 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 
 
 /* re__copy_and_pad():
- *	Copy string and pad with spaces
+ *	Copy display lines and pad with spaces
  */
 private void
 re__copy_and_pad(Char *dst, const Char *src, size_t width)
 {
+#ifdef COLOR
+	GrParams *gdst = (GrParams *)dst - 1;
+	const GrParams *gsrc = (const GrParams *)src - 1;
+#endif
 	size_t i;
 
 	for (i = 0; i < width; i++) {
 		if (*src == '\0')
 			break;
 		*dst++ = *src++;
+#ifdef COLOR
+		*gdst-- = *gsrc--;
+#endif
 	}
 
-	for (; i < width; i++)
+	for (; i < width; i++) {
 		*dst++ = ' ';
+#ifdef COLOR
+		*gdst-- = gr_default();
+#endif
+	}
 
 	*dst = '\0';
+#ifdef COLOR
+	*gdst = gr_default();
+#endif
 }
 
 

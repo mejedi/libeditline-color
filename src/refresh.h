@@ -48,7 +48,7 @@ typedef struct {
 	int	r_newcv;
 } el_refresh_t;
 
-protected void	re_putc(EditLine *, Int, int);
+protected void	re_addc(EditLine *, GrParams, Int);
 protected void	re_clear_lines(EditLine *);
 protected void	re_clear_display(EditLine *);
 protected void	re_refresh(EditLine *);

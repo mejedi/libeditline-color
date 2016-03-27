@@ -95,7 +95,7 @@ protected void	terminal_move_to_line(EditLine *, int);
 protected void	terminal_move_to_char(EditLine *, int);
 protected void	terminal_clear_EOL(EditLine *, int);
 protected void	terminal_overwrite(EditLine *, const Char *, size_t);
-protected void	terminal_insertwrite(EditLine *, Char *, int);
+protected void	terminal_insertwrite(EditLine *, const Char *, size_t);
 protected void	terminal_deletechars(EditLine *, int);
 protected void	terminal_clear_screen(EditLine *);
 protected void	terminal_beep(EditLine *);
