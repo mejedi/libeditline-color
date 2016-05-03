@@ -135,6 +135,7 @@ struct editline {
 	el_refresh_t	  el_refresh;	/* Refresh stuff		*/
 	el_prompt_t	  el_prompt;	/* Prompt stuff			*/
 	el_prompt_t	  el_rprompt;	/* Prompt stuff			*/
+	el_prompt_t	  el_mprompt;	/* Prompt stuff			*/
 	el_chared_t	  el_chared;	/* Characted editor stuff	*/
 	el_map_t	  el_map;	/* Key mapping stuff		*/
 	el_keymacro_t	  el_keymacro;	/* Key binding stuff		*/

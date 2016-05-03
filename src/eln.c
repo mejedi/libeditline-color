@@ -114,6 +114,7 @@ el_set(EditLine *el, int op, ...)
 
 	switch (op) {
 	case EL_PROMPT:         /* el_pfunc_t */
+	case EL_MPROMPT:
 	case EL_RPROMPT: {
 		el_pfunc_t p = va_arg(ap, el_pfunc_t);
 		ret = prompt_set(el, p, 0, op, 0);
@@ -135,6 +136,7 @@ el_set(EditLine *el, int op, ...)
 	}
 
 	case EL_PROMPT_ESC:
+	case EL_MPROMPT_ESC:
 	case EL_RPROMPT_ESC: {
 		el_pfunc_t p = va_arg(ap, el_pfunc_t);
 		int c = va_arg(ap, int);
@@ -287,6 +289,7 @@ el_get(EditLine *el, int op, ...)
 
 	switch (op) {
 	case EL_PROMPT:         /* el_pfunc_t * */
+	case EL_MPROMPT:
 	case EL_RPROMPT: {
 		el_pfunc_t *p = va_arg(ap, el_pfunc_t *);
 		ret = prompt_get(el, p, 0, op);
@@ -294,6 +297,7 @@ el_get(EditLine *el, int op, ...)
 	}
 
 	case EL_PROMPT_ESC: /* el_pfunc_t *, char **/
+	case EL_MPROMPT_ESC:
 	case EL_RPROMPT_ESC: {
 		el_pfunc_t *p = va_arg(ap, el_pfunc_t *);
 		char *c = va_arg(ap, char *);

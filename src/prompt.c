@@ -224,6 +224,8 @@ prompt_print(EditLine *el, int op)
 
 	if (op == EL_PROMPT)
 		elp = &el->el_prompt;
+	else if (op == EL_MPROMPT)
+		elp = &el->el_mprompt;
 	else
 		elp = &el->el_rprompt;
 
@@ -271,6 +273,10 @@ prompt_init(EditLine *el)
 	el->el_rprompt.p_pos.v = 0;
 	el->el_rprompt.p_pos.h = 0;
 	el->el_rprompt.p_ignore = '\0';
+	el->el_mprompt.p_func = prompt_default_r;
+	el->el_mprompt.p_pos.v = 0;
+	el->el_mprompt.p_pos.h = 0;
+	el->el_mprompt.p_ignore = '\0';
 	return 0;
 }
 
@@ -295,6 +301,8 @@ prompt_set(EditLine *el, el_pfunc_t prf, Char c, int op, int wide)
 
 	if (op == EL_PROMPT || op == EL_PROMPT_ESC)
 		p = &el->el_prompt;
+	else if (op == EL_MPROMPT || op == EL_MPROMPT_ESC)
+		p = &el->el_mprompt;
 	else
 		p = &el->el_rprompt;
 
@@ -330,6 +338,8 @@ prompt_get(EditLine *el, el_pfunc_t *prf, Char *c, int op)
 
 	if (op == EL_PROMPT)
 		p = &el->el_prompt;
+	else if (op == EL_MPROMPT)
+		p = &el->el_mprompt;
 	else
 		p = &el->el_rprompt;
 

@@ -222,6 +222,7 @@ re_refresh(EditLine *el)
 #ifdef notyet
 	size_t termsz;
 #endif
+	int mprompt = 0;
 
 	ELRE_DEBUG(1, (__F, "el->el_line.buffer = :%s:\r\n",
 	    el->el_line.buffer));
@@ -237,6 +238,24 @@ re_refresh(EditLine *el)
 	el->el_refresh.r_cursor.h = 0;
 	el->el_refresh.r_cursor.v = 0;
 
+	/* check if we should consider activating multiline prompt mode */
+	for (cp = el->el_line.buffer; cp < el->el_line.lastchar; cp++) {
+		if (*cp == '\n') {
+			prompt_print(el, EL_MPROMPT);
+			mprompt = el->el_mprompt.p_pos.h;
+			break;
+		}
+	}
+	if (mprompt == 0 || el->el_mprompt.p_pos.v != 0) {
+		/*
+		 * a single line of input OR mprompt empty
+		 * OR mprompt contains embeded NLs (rejected)
+		 */
+		mprompt = 0;
+		el->el_mprompt.p_pos.h = 0;
+		el->el_mprompt.p_pos.v = 0;
+	}
+
 	if (el->el_line.cursor >= el->el_line.lastchar) {
 		if (el->el_map.current == el->el_map.alt
 		    && el->el_line.lastchar != el->el_line.buffer)
@@ -244,11 +263,15 @@ re_refresh(EditLine *el)
 		else
 			el->el_line.cursor = el->el_line.lastchar;
 	}
-
 	cur.h = -1;		/* set flag in case I'm not set */
 	cur.v = 0;
 
-	prompt_print(el, EL_PROMPT);
+	if (mprompt == 0) {
+		/* reset the Drawing cursor - overwriting mprompt */
+		el->el_refresh.r_cursor.h = 0;
+		el->el_refresh.r_cursor.v = 0;
+		prompt_print(el, EL_PROMPT);
+	}
 
 	/* draw the current input buffer */
 #if notyet
@@ -281,6 +304,10 @@ re_refresh(EditLine *el)
                         }
 		}
 		re_addc(el, gr_default(), *cp);
+		if (mprompt && *cp == '\n') {
+			while (el->el_refresh.r_cursor.h != mprompt)
+				re_putc(el, gr_default(), ' ', 1);
+		}
 	}
 
 	if (cur.h == -1) {	/* if I haven't been set yet, I'm at the end */
@@ -1045,6 +1072,7 @@ re_refresh_cursor(EditLine *el)
 {
 	Char *cp;
 	int h, v, th, w;
+	int mprompt;
 
 	if (el->el_line.cursor >= el->el_line.lastchar) {
 		if (el->el_map.current == el->el_map.alt
@@ -1055,15 +1083,26 @@ re_refresh_cursor(EditLine *el)
 	}
 
 	/* first we must find where the cursor is... */
-	h = el->el_prompt.p_pos.h;
-	v = el->el_prompt.p_pos.v;
+	mprompt = el->el_mprompt.p_pos.h;
+	if (mprompt == 0) {
+		h = el->el_prompt.p_pos.h;
+		v = el->el_prompt.p_pos.v;
+	} else {
+		/*
+		 * re_refresh rejects mprompt if it contains NLs or if
+		 * terminal width is insufficient to accomodate mprompt,
+		 * hence v = 0.
+		 */
+		h = mprompt;
+		v = 0;
+	}
 	th = el->el_terminal.t_size.h;	/* optimize for speed */
 
 	/* do input buffer to el->el_line.cursor */
 	for (cp = el->el_line.buffer; cp < el->el_line.cursor; cp++) {
                 switch (ct_chr_class(*cp)) {
 		case CHTYPE_NL:  /* handle newline in data part too */
-			h = 0;
+			h = mprompt;
 			v++;
 			break;
 		case CHTYPE_TAB: /* if a tab, to next tab stop */
