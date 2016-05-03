@@ -113,6 +113,7 @@ typedef struct el_state_t {
 #include "sig.h"
 #include "help.h"
 #include "read.h"
+#include "highlight.h"
 
 struct editline {
 	Char		 *el_prog;	/* the program name		*/
@@ -148,6 +149,7 @@ struct editline {
 	ct_buffer_t       el_lgcyconv;  /* Buffer for legacy wrappers   */
 	LineInfo          el_lgcylinfo; /* Legacy LineInfo buffer       */
 #endif
+	el_highlight_t    el_highlight; /* Color highlighting stuff     */
 };
 
 protected int	el_editmode(EditLine *, int, const Char **);

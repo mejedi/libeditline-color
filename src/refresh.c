@@ -56,7 +56,7 @@ private void	re_putc(EditLine *, GrParams, Int, int);
 private void	re_update_line(EditLine *, Char *, Char *, int);
 private void	re_insert (EditLine *, Char *, int, int, Char *, int);
 private void	re_delete(EditLine *, Char *, int, int, int);
-private void	re_fastputc(EditLine *, Int);
+private void	re_fastputc(EditLine *, Int, GrParams);
 private void	re_clear_eol(EditLine *, int, int, int);
 private void	re__strncopy(Char *, Char *, size_t);
 private void	re__copy_and_pad(Char *, const Char *, size_t);
@@ -223,6 +223,9 @@ re_refresh(EditLine *el)
 	size_t termsz;
 #endif
 	int mprompt = 0;
+#ifdef COLOR
+	GrParams *gr;
+#endif
 
 	ELRE_DEBUG(1, (__F, "el->el_line.buffer = :%s:\r\n",
 	    el->el_line.buffer));
@@ -273,6 +276,12 @@ re_refresh(EditLine *el)
 		prompt_print(el, EL_PROMPT);
 	}
 
+	/* highlight */
+	if (highlight_all(el) == 0)
+		gr = el->el_highlight.h_buf;
+	else
+		gr = NULL;
+
 	/* draw the current input buffer */
 #if notyet
 	termsz = el->el_terminal.t_size.h * el->el_terminal.t_size.v;
@@ -303,7 +312,12 @@ re_refresh(EditLine *el)
 				cur.v++;
                         }
 		}
-		re_addc(el, gr_default(), *cp);
+#ifdef COLOR
+		if (gr)
+			re_addc(el, *gr++, *cp);
+		else
+#endif
+			re_addc(el, gr_default(), *cp);
 		if (mprompt && *cp == '\n') {
 			while (el->el_refresh.r_cursor.h != mprompt)
 				re_putc(el, gr_default(), ' ', 1);
@@ -1074,6 +1088,13 @@ re_refresh_cursor(EditLine *el)
 	int h, v, th, w;
 	int mprompt;
 
+#ifdef COLOR
+	if (highlight_refresh_cursor(el) != 0) {
+		re_refresh(el);
+		return;
+	}
+#endif
+
 	if (el->el_line.cursor >= el->el_line.lastchar) {
 		if (el->el_map.current == el->el_map.alt
 		    && el->el_line.lastchar != el->el_line.buffer)
@@ -1143,13 +1164,17 @@ re_refresh_cursor(EditLine *el)
  *	Add a character fast.
  */
 private void
-re_fastputc(EditLine *el, Int c)
+re_fastputc(EditLine *el, Int c, GrParams gr)
 {
 	int w = Width((Char)c);
 	while (w > 1 && el->el_cursor.h + w > el->el_terminal.t_size.h)
-	    re_fastputc(el, ' ');
+	    re_fastputc(el, ' ', gr);
 
 	terminal__putc(el, c);
+#ifdef COLOR
+	EL_GRPARAMS(el, el_display, el->el_cursor.v, el->el_cursor.h)
+		= gr;
+#endif
 	el->el_display[el->el_cursor.v][el->el_cursor.h++] = c;
 	while (--w > 0)
 		el->el_display[el->el_cursor.v][el->el_cursor.h++]
@@ -1200,6 +1225,7 @@ re_fastaddc(EditLine *el)
 {
 	Char c;
 	int rhdiff;
+	GrParams gr = gr_default();
 
 	c = el->el_line.cursor[-1];
 
@@ -1213,12 +1239,19 @@ re_fastaddc(EditLine *el)
 		re_refresh(el);	/* clear out rprompt if less than 1 char gap */
 		return;
 	}			/* else (only do at end of line, no TAB) */
+#ifdef COLOR
+	if (highlight_fastaddc(el, &gr) != 0) {
+		re_refresh(el);	/* highlighting changed in a significant way */
+		return;
+	}
+	terminal_sgr(el, gr_default(), gr);
+#endif
 	switch (ct_chr_class(c)) {
 	case CHTYPE_TAB: /* already handled, should never happen here */
 		break;
 	case CHTYPE_NL:
 	case CHTYPE_PRINT:
-		re_fastputc(el, c);
+		re_fastputc(el, c, gr);
 		break;
 	case CHTYPE_ASCIICTL:
 	case CHTYPE_NONPRINT: {
@@ -1226,10 +1259,13 @@ re_fastaddc(EditLine *el)
 		ssize_t i, n =
 		    ct_visual_char(visbuf, VISUAL_WIDTH_MAX, (Char)c);
 		for (i = 0; n-- > 0; ++i)
-			re_fastputc(el, visbuf[i]);
+			re_fastputc(el, visbuf[i], gr);
 		break;
 	}
 	}
+#ifdef COLOR
+	terminal_sgr(el, gr, gr_default());
+#endif
 	terminal__flush(el);
 }
 

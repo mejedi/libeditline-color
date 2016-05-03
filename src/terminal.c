@@ -700,6 +700,13 @@ terminal__sgr(EditLine *el, GrParams from, GrParams to)
 		terminal___sgr(el, from, to);
 	return to;
 }
+
+protected void
+terminal_sgr(EditLine *el, GrParams from, GrParams to)
+{
+	terminal__sgr(el, from, to);
+}
+
 #endif
 
 

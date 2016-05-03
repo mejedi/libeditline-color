@@ -142,6 +142,7 @@ el_init_fd(const char *prog, FILE *fin, FILE *fout, FILE *ferr,
 	(void) prompt_init(el);
 	(void) sig_init(el);
 	(void) read_init(el);
+	(void) highlight_init(el);
 
 	return el;
 }
@@ -168,6 +169,7 @@ el_end(EditLine *el)
 	hist_end(el);
 	prompt_end(el);
 	sig_end(el);
+	highlight_end(el);
 
 	el_free(el->el_prog);
 #ifdef WIDECHAR
@@ -245,6 +247,10 @@ FUN(el,set)(EditLine *el, int op, ...)
 
 	case EL_EDITOR:
 		rv = map_set_editor(el, va_arg(ap, Char *));
+		break;
+
+	case EL_HIGHLIGHT:
+		rv = highlight_set(el, va_arg(ap, el_hfunc_t), 1);
 		break;
 
 	case EL_SIGNAL:
@@ -443,6 +449,9 @@ FUN(el,get)(EditLine *el, int op, ...)
 	case EL_EDITOR:
 		rv = map_get_editor(el, va_arg(ap, const Char **));
 		break;
+
+	case EL_HIGHLIGHT:
+		rv = highlight_get(el, va_arg(ap, el_hfunc_t *));
 
 	case EL_SIGNAL:
 		*va_arg(ap, int *) = (el->el_flags & HANDLE_SIGNALS);

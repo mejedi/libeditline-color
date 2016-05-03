@@ -116,6 +116,7 @@ protected int	terminal_echotc(EditLine *, int, const Char **);
 protected void	terminal_writec(EditLine *, Int);
 protected int	terminal__putc(EditLine *, Int);
 protected void	terminal__flush(EditLine *);
+protected void	terminal_sgr(EditLine *, GrParams, GrParams);
 
 /*
  * Easy access macros

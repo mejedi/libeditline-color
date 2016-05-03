@@ -160,6 +160,7 @@ unsigned char	_el_fn_complete(EditLine *, int);
 #define	EL_ALIAS_TEXT	24	/* , el_afunc_t, void *);	      set     */
 #define	EL_MPROMPT	60	/* , prompt_func, Char);	      set/get */
 #define	EL_MPROMPT_ESC	61	/* , prompt_func, Char);	      set/get */
+#define	EL_HIGHLIGHT	62	/* , highlight_func);		      set/get */
 
 #define	EL_BUILTIN_GETCFN	(NULL)
 

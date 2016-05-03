@@ -135,8 +135,8 @@ am__libedit_la_SOURCES_DIST = chared.c common.c el.c emacs.c hist.c \
 	tokenizer.c history.c filecomplete.c readline.c chared.h el.h \
 	hist.h histedit.h keymacro.h map.h chartype.h parse.h prompt.h \
 	read.h refresh.h search.h sig.h sys.h terminal.h tty.h vis.h \
-	filecomplete.h editline/readline.h strlcpy.c strlcat.c vis.c \
-	unvis.c eln.c
+	filecomplete.h editline/readline.h highlight.h highlight.c \
+	strlcpy.c strlcat.c vis.c unvis.c eln.c
 @HAVE_STRLCPY_FALSE@am__objects_1 = strlcpy.lo
 @HAVE_STRLCAT_FALSE@am__objects_2 = strlcat.lo
 @HAVE_VIS_FALSE@am__objects_3 = vis.lo
@@ -146,8 +146,8 @@ am_libedit_la_OBJECTS = chared.lo common.lo el.lo emacs.lo hist.lo \
 	keymacro.lo map.lo chartype.lo parse.lo prompt.lo read.lo \
 	refresh.lo search.lo sig.lo terminal.lo tty.lo vi.lo fgetln.lo \
 	wcsdup.lo tokenizer.lo history.lo filecomplete.lo readline.lo \
-	$(am__objects_1) $(am__objects_2) $(am__objects_3) \
-	$(am__objects_4) $(am__objects_5)
+	highlight.lo $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3) $(am__objects_4) $(am__objects_5)
 @WIDECHAR_TRUE@am__objects_6 = tokenizern.lo historyn.lo
 am__objects_7 = fcns.lo help.lo $(am__objects_6)
 nodist_libedit_la_OBJECTS = $(am__objects_7)
@@ -351,9 +351,9 @@ libedit_la_SOURCES = chared.c common.c el.c emacs.c hist.c keymacro.c \
 	history.c filecomplete.c readline.c chared.h el.h hist.h \
 	histedit.h keymacro.h map.h chartype.h parse.h prompt.h read.h \
 	refresh.h search.h sig.h sys.h terminal.h tty.h vis.h \
-	filecomplete.h editline/readline.h $(am__append_2) \
-	$(am__append_3) $(am__append_4) $(am__append_5) \
-	$(am__append_6)
+	filecomplete.h editline/readline.h highlight.h highlight.c \
+	$(am__append_2) $(am__append_3) $(am__append_4) \
+	$(am__append_5) $(am__append_6)
 EXTRA_DIST = makelist shlib_version
 nobase_include_HEADERS = histedit.h editline/readline.h
 nodist_libedit_la_SOURCES = $(BUILT_SOURCES)
@@ -448,6 +448,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fgetln.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filecomplete.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/help.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/highlight.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/historyn.Plo@am__quote@

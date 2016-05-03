@@ -154,6 +154,10 @@ el_set(EditLine *el, int op, ...)
 		    &el->el_lgcyconv));
 		break;
 
+	case EL_HIGHLIGHT:
+		ret = highlight_set(el, va_arg(ap, el_hfunc_t), 0);
+		break;
+
 	case EL_SIGNAL:         /* int */
 	case EL_EDITMODE:
 	case EL_UNBUFFERED:
@@ -319,6 +323,10 @@ el_get(EditLine *el, int op, ...)
 
 	case EL_TERMINAL:       /* const char ** */
 		ret = el_wget(el, op, va_arg(ap, const char **));
+		break;
+
+	case EL_HIGHLIGHT:
+		ret = highlight_get(el, va_arg(ap, el_hfunc_t *));
 		break;
 
 	case EL_SIGNAL:         /* int * */

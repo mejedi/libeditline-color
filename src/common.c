@@ -547,7 +547,10 @@ protected el_action_t
 /*ARGSUSED*/
 ed_newline(EditLine *el, Int c __attribute__((__unused__)))
 {
-
+	if (highlight_nocursor(el) != 0) {
+		el->el_highlight.h_nocursor = 1;
+		re_refresh(el);
+	}
 	re_goto_bottom(el);
 	*el->el_line.lastchar++ = '\n';
 	*el->el_line.lastchar = '\0';
