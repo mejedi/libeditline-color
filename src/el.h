@@ -257,7 +257,7 @@ el_grparams(EditLine *el, const Char *cp)
 private inline GrParams gr_default()
 {
 	GrParams gr = {};
-	gr.fgcolor = 1;
+	gr.fgcolor = 7;
 	return gr;
 }
 
