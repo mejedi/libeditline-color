@@ -58,7 +58,7 @@ private void	re_insert (EditLine *, Char *, int, int, Char *, int);
 private void	re_delete(EditLine *, Char *, int, int, int);
 private void	re_fastputc(EditLine *, Int, GrParams);
 private void	re_clear_eol(EditLine *, int, int, int);
-private void	re__strncopy(Char *, Char *, size_t);
+private void	re_strncpy(EditLine *, Char *, Char *, size_t);
 private void	re__copy_and_pad(Char *, const Char *, size_t);
 
 #ifdef DEBUG_REFRESH
@@ -419,6 +419,10 @@ re_insert(EditLine *el __attribute__((__unused__)),
     Char *d, int dat, int dlen, Char *s, int num)
 {
 	Char *a, *b;
+#ifdef COLOR
+	GrParams *ga, *gb;
+	const GrParams *gs;
+#endif
 
 	if (num <= 0)
 		return;
@@ -434,8 +438,17 @@ re_insert(EditLine *el __attribute__((__unused__)),
 	if (num > 0) {
 		b = d + dlen - 1;
 		a = b - num;
+#ifdef COLOR
+		gb = (GrParams *)el_grparams(el, b);
+		ga = gb + num;
+		while (a >= &d[dat]) {
+			*b-- = *a--;
+			*gb++ = *ga++;
+		}
+#else
 		while (a >= &d[dat])
 			*b-- = *a--;
+#endif
 		d[dlen] = '\0';	/* just in case */
 	}
 
@@ -445,8 +458,18 @@ re_insert(EditLine *el __attribute__((__unused__)),
 	ELRE_DEBUG(1, (__F, "s == \"%s\"\n", ct_encode_string(s)));
 
 	/* copy the characters */
+#ifdef COLOR
+	gs = el_grparams(el, s);
+	a = d + dat;
+	ga = (GrParams *)el_grparams(el, a);
+	for (; (a < d + dlen) && (num > 0); num--) {
+		*a++ = *s++;
+		*ga-- = *gs--;
+	}
+#else
 	for (a = d + dat; (a < d + dlen) && (num > 0); num--)
 		*a++ = *s++;
+#endif
 
 #ifdef notyet
         /* ct_encode_string() uses a static buffer, so we can't conveniently
@@ -468,6 +491,9 @@ re_delete(EditLine *el __attribute__((__unused__)),
     Char *d, int dat, int dlen, int num)
 {
 	Char *a, *b;
+#ifdef COLOR
+	GrParams *ga, *gb;
+#endif
 
 	if (num <= 0)
 		return;
@@ -483,8 +509,17 @@ re_delete(EditLine *el __attribute__((__unused__)),
 	if (num > 0) {
 		b = d + dat;
 		a = b + num;
+#ifdef COLOR
+		gb = (GrParams *)el_grparams(el, b);
+		ga = gb - num;
+		while (a < &d[dlen]) {
+			*b++ = *a++;
+			*gb-- = *ga--;
+		}
+#else
 		while (a < &d[dlen])
 			*b++ = *a++;
+#endif
 		d[dlen] = '\0';	/* just in case */
 	}
 	ELRE_DEBUG(1,
@@ -493,15 +528,24 @@ re_delete(EditLine *el __attribute__((__unused__)),
 }
 
 
-/* re__strncopy():
+/* re_strncpy():
  *	Like strncpy without padding.
  */
 private void
-re__strncopy(Char *a, Char *b, size_t n)
+re_strncpy(EditLine *el, Char *a, Char *b, size_t n)
 {
-
+#ifdef COLOR
+	GrParams *ga = (GrParams *)el_grparams(el, a);
+	GrParams *gb = (GrParams *)el_grparams(el, b);
+	while (n-- && *b) {
+		*ga-- = *gb--;
+		*a++ = *b++;
+	}
+#else
+	(void)el;
 	while (n-- && *b)
 		*a++ = *b++;
+#endif
 }
 
 /* re_clear_eol():
@@ -870,12 +914,12 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 			 */
 			len = (size_t) ((nsb - nfd) - fx);
 			terminal_overwrite(el, (nfd + fx), len);
-			re__strncopy(ofd + fx, nfd + fx, len);
+			re_strncpy(el, ofd + fx, nfd + fx, len);
 		} else {
 			ELRE_DEBUG(1, (__F, "without anything to save\r\n"));
 			len = (size_t)(nsb - nfd);
 			terminal_overwrite(el, nfd, len);
-			re__strncopy(ofd, nfd, len);
+			re_strncpy(el, ofd, nfd, len);
 			/*
 		         * Done
 		         */
@@ -909,7 +953,7 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 		         */
 			len = (size_t) (nsb - nfd);
 			terminal_overwrite(el, nfd, len);
-			re__strncopy(ofd, nfd, len);
+			re_strncpy(el, ofd, nfd, len);
 
 		} else {
 			ELRE_DEBUG(1, (__F,
@@ -999,12 +1043,12 @@ re_update_line(EditLine *el, Char *old, Char *new, int i)
 			 */
 			len = (size_t) ((nsb - nfd) - fx);
 			terminal_overwrite(el, (nfd + fx), len);
-			re__strncopy(ofd + fx, nfd + fx, len);
+			re_strncpy(el, ofd + fx, nfd + fx, len);
 		} else {
 			ELRE_DEBUG(1, (__F, "without anything to save\r\n"));
 			len = (size_t) (nsb - nfd);
 			terminal_overwrite(el, nfd, len);
-			re__strncopy(ofd, nfd, len);
+			re_strncpy(el, ofd, nfd, len);
 		}
 	}
 	/*
