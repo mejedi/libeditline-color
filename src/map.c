@@ -1396,10 +1396,16 @@ protected int
 map_addfunc(EditLine *el, const Char *name, const Char *help, el_func_t func)
 {
 	void *p;
-	size_t nf = el->el_map.nfunc + 1;
+	size_t nf = el->el_map.nfunc + 1, i;
 
 	if (name == NULL || help == NULL || func == NULL)
 		return -1;
+
+	for (i = 0; i < el->el_map.nfunc; i++)
+		if (name && Strcmp(el->el_map.help[i].name, name) == 0) {
+		    el->el_map.func[el->el_map.help[i].func] = func;
+			return 0;
+		}
 
 	if ((p = el_realloc(el->el_map.func, nf *
 	    sizeof(*el->el_map.func))) == NULL)
