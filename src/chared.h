@@ -120,6 +120,7 @@ typedef struct el_chared_t {
 	el_afunc_t	c_aliasfun;
 	void *		c_resizearg;
 	void *		c_aliasarg;
+	int		c_hpos;
 } el_chared_t;
 
 

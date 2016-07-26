@@ -832,6 +832,14 @@ ed_prev_line(EditLine *el, Int c __attribute__((__unused__)))
 {
 	Char *ptr;
 	int nchars = c_hpos(el);
+	el_action_t lastcmd = el->el_state.lastcmd;
+
+	if (el->el_chared.c_hpos > nchars && (
+	    lastcmd == ED_PREV_LINE || lastcmd == ED_SMART_PREV_LINE ||
+	    lastcmd == ED_NEXT_LINE || lastcmd == ED_SMART_NEXT_LINE))
+	    nchars = el->el_chared.c_hpos;
+	else
+		el->el_chared.c_hpos = nchars;
 
 	/*
          * Move to the line requested
@@ -875,6 +883,14 @@ ed_next_line(EditLine *el, Int c __attribute__((__unused__)))
 {
 	Char *ptr;
 	int nchars = c_hpos(el);
+	el_action_t lastcmd = el->el_state.lastcmd;
+
+	if (el->el_chared.c_hpos > nchars && (
+	    lastcmd == ED_PREV_LINE || lastcmd == ED_SMART_PREV_LINE ||
+	    lastcmd == ED_NEXT_LINE || lastcmd == ED_SMART_NEXT_LINE))
+	    nchars = el->el_chared.c_hpos;
+	else
+		el->el_chared.c_hpos = nchars;
 
 	/*
          * Move to the line requested
@@ -898,6 +914,60 @@ ed_next_line(EditLine *el, Int c __attribute__((__unused__)))
 	return CC_CURSOR;
 }
 
+private int
+is_multi_line(EditLine *el)
+{
+	Char *ptr = el->el_line.buffer;
+	for (;ptr < el->el_line.lastchar; ptr++)
+		if (*ptr == STR('\n'))
+			return 1;
+	return 0;
+}
+
+/* ed_smart_prev_line():
+ *	Move up one line or move to prev history line
+ *	Could be [k] [^p]
+ */
+protected el_action_t
+ed_smart_prev_line(EditLine *el, Int c __attribute__((__unused__)))
+{
+	Char *ptr;
+	int nchars, multi;
+	el_action_t res = ed_prev_line(el, c);
+
+	if (res != CC_ERROR) return res;
+
+	multi = is_multi_line(el);
+	ptr = el->el_line.cursor;
+	res = ed_prev_history(el, c);
+	switch (res) {
+	case CC_REFRESH_BEEP:
+		el->el_line.cursor = ptr;
+		break;
+	case CC_REFRESH:
+		if (!multi || !is_multi_line(el)) break;
+		nchars = el->el_chared.c_hpos;
+		ptr = el->el_line.buffer;
+		for (;
+		     nchars-- > 0 && ptr < el->el_line.lastchar && *ptr != '\n';
+		     ptr++)
+			continue;
+		el->el_line.cursor = ptr;
+		break;
+	}
+	return res;
+}
+
+/* ed_smart_next_line():
+ *	Move down one line or move to next history line
+ *	Could be [j] [^n]
+ */
+protected el_action_t
+ed_smart_next_line(EditLine *el, Int c __attribute__((__unused__)))
+{
+	el_action_t res = ed_next_line(el, c);
+	return (res == CC_ERROR ? ed_next_history(el, c) : res);
+}
 
 /* ed_command():
  *	Editline extended command
